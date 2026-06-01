@@ -1,9 +1,6 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 
-
-console.log(import.meta.env.VITE_SUPABASE_URL);
-
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
   import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -48,6 +45,9 @@ export default function DescentLog() {
   const [loadState, setLoadState]     = useState("loading");
   const [preChecked, setPreChecked]   = useState({});
   const [resetChecked, setResetChecked] = useState({});
+  const [pwPrompt, setPwPrompt]       = useState(false);
+  const [pwValue, setPwValue]         = useState("");
+  const [pwError, setPwError]         = useState(false);
 
   // ── Load entries on mount ──────────────────────────────────────────
   useEffect(() => {
@@ -65,8 +65,21 @@ export default function DescentLog() {
   // ── Helpers ───────────────────────────────────────────────────────
   const handleChange = (field, value) => setForm(f => ({ ...f, [field]: value }));
 
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     if (!form.what_did || !form.what_body || !form.what_produced) return;
+    setPwPrompt(true);
+    setPwValue("");
+    setPwError(false);
+  };
+
+  const handlePwConfirm = async () => {
+    if (pwValue !== import.meta.env.VITE_APP_PASSWORD) {
+      setPwError(true);
+      setPwValue("");
+      setTimeout(() => setPwError(false), 2000);
+      return;
+    }
+    setPwPrompt(false);
     setSaveState("saving");
     const entry = { ...form, id: Date.now() };
     const { error } = await supabase.from("descents").insert([entry]);
@@ -102,6 +115,29 @@ export default function DescentLog() {
   return (
     <div style={s.root}>
       <div style={s.bgNoise} />
+
+      {/* Password Modal */}
+      {pwPrompt && (
+        <div style={s.pwOverlay}>
+          <div style={s.pwModal}>
+            <div style={s.pwTitle}>Enter password to save</div>
+            <input
+              type="password"
+              value={pwValue}
+              onChange={e => setPwValue(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && handlePwConfirm()}
+              placeholder="Password"
+              autoFocus
+              style={{ ...s.input, ...(pwError ? { borderColor: "#f97316" } : {}) }}
+            />
+            {pwError && <div style={s.pwError}>Incorrect password</div>}
+            <div style={s.pwBtns}>
+              <button style={s.pwCancel} onClick={() => setPwPrompt(false)}>Cancel</button>
+              <button style={s.submitBtn} onClick={handlePwConfirm}>Confirm</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Header */}
       <div style={s.header}>
@@ -459,4 +495,10 @@ const s = {
   detailBlock: { borderLeft: "2px solid rgba(96,165,250,0.2)", paddingLeft: 16, display: "flex", flexDirection: "column", gap: 6 },
   detailLabel: { fontSize: 11, color: "#475569", textTransform: "uppercase", letterSpacing: "0.08em" },
   detailValue: { fontSize: 15, color: "#94a3b8", lineHeight: 1.6 },
+  pwOverlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center" },
+  pwModal: { background: "#141720", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, padding: "28px 32px", display: "flex", flexDirection: "column", gap: 16, minWidth: 300 },
+  pwTitle: { fontSize: 16, fontWeight: "bold", color: "#f1f5f9" },
+  pwError: { fontSize: 12, color: "#f97316", fontStyle: "italic" },
+  pwBtns: { display: "flex", gap: 10, justifyContent: "flex-end" },
+  pwCancel: { background: "transparent", border: "1px solid rgba(255,255,255,0.1)", color: "#64748b", padding: "8px 18px", borderRadius: 6, cursor: "pointer", fontSize: 14, fontFamily: "Georgia,serif" },
 };
